@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.118.0";
 
 const DEFAULT_ORIGIN = "https://pruskaadam-hub.github.io";
 const MAX_BODY_BYTES = 65_536;

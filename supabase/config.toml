@@ -1,5 +1,7 @@
 project_id = "kmntccvrsuhndupswrig"
 
 [functions.marvin-api]
-verify_jwt = true
+# Authentication is enforced by auth.getUser() and the email allowlist in the handler.
+# This also permits browser CORS preflight and current Supabase signing keys.
+verify_jwt = false
 
