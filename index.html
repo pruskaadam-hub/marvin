@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#080b12" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; connect-src 'self' https://kmntccvrsuhndupswrig.supabase.co; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" />
+    <meta name="description" content="M.A.R.V.I.N. — osobní operační panel Adama Prušky" />
+    <title>M.A.R.V.I.N.</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="M.A.R.V.I.N. domů">
+          <span class="brand-mark">M</span>
+          <span>
+            <strong>M.A.R.V.I.N.</strong>
+            <small>Adamův operační panel</small>
+          </span>
+        </a>
+        <div class="topbar-actions">
+          <span id="connectionBadge" class="status-pill status-loading">
+            <span class="status-dot"></span>
+            <span>Načítám</span>
+          </span>
+          <button id="refreshButton" class="icon-button" type="button" aria-label="Obnovit data" title="Obnovit data">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-14.9-4M4 4v5h5M4 13a8.1 8.1 0 0 0 14.9 4M20 20v-5h-5"/></svg>
+          </button>
+          <button id="signOutButton" class="text-button hidden" type="button">Odhlásit</button>
+        </div>
+      </header>
+
+      <section id="setupPanel" class="auth-card hidden" aria-labelledby="setupTitle">
+        <p class="eyebrow">Jednorázové dokončení</p>
+        <h1 id="setupTitle">Panel čeká na veřejný Supabase klíč</h1>
+        <p>Do <code>config.js</code> doplň pouze veřejný publishable key projektu. Tajný klíč n8n patří výhradně do Supabase Secrets.</p>
+        <div class="security-note">
+          <strong>Správně:</strong> prohlížeč → Supabase Auth → Edge Function → n8n. Web nikdy nevolá n8n přímo.
+        </div>
+      </section>
+
+      <section id="loginPanel" class="auth-card hidden" aria-labelledby="loginTitle">
+        <p class="eyebrow">Soukromý přístup</p>
+        <h1 id="loginTitle">Přihlášení do M.A.R.V.I.N.</h1>
+        <p>Na povolenou adresu přijde jednorázový přihlašovací odkaz.</p>
+        <form id="loginForm" class="login-form">
+          <label for="emailInput">E-mail</label>
+          <div class="field-row">
+            <input id="emailInput" type="email" autocomplete="email" required />
+            <button class="primary-button" type="submit">Poslat odkaz</button>
+          </div>
+        </form>
+        <p id="loginMessage" class="form-message" role="status"></p>
+      </section>
+
+      <section id="appPanel" class="app hidden" aria-live="polite">
+        <div class="hero">
+          <div>
+            <p id="todayLabel" class="eyebrow"></p>
+            <h1 id="greeting">Dobré ráno, Adame.</h1>
+            <p id="briefing" class="briefing">Načítám dnešní stav.</p>
+          </div>
+          <div class="hero-meta">
+            <span id="completenessBadge" class="data-badge data-loading">Načítám data</span>
+            <span id="lastComplete">Poslední úplné zpracování: —</span>
+          </div>
+        </div>
+
+        <section class="section-block" aria-labelledby="areasTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Práce</p>
+              <h2 id="areasTitle">Úkoly podle oblastí</h2>
+            </div>
+            <span id="taskCount" class="count-badge">0 otevřených</span>
+          </div>
+          <div id="areaGrid" class="area-grid"></div>
+        </section>
+
+        <div class="dashboard-grid">
+          <section class="panel panel-wide" aria-labelledby="timelineTitle">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Dnes</p>
+                <h2 id="timelineTitle">Časová osa</h2>
+              </div>
+            </div>
+            <div id="timeline" class="timeline"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="prioritiesTitle">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Fokus</p>
+                <h2 id="prioritiesTitle">Tři priority</h2>
+              </div>
+            </div>
+            <ol id="priorities" class="priority-list"></ol>
+          </section>
+
+          <section class="panel" aria-labelledby="tomorrowTitle">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Další krok</p>
+                <h2 id="tomorrowTitle">Zítra</h2>
+              </div>
+            </div>
+            <div id="tomorrow" class="compact-list"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="attentionTitle">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Vyžaduje zásah</p>
+                <h2 id="attentionTitle">Pozornost</h2>
+              </div>
+            </div>
+            <div id="attention" class="compact-list"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="noteTitle">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Rychlý vstup</p>
+                <h2 id="noteTitle">Přidat poznámku</h2>
+              </div>
+            </div>
+            <form id="noteForm" class="note-form">
+              <label for="noteText">Co má M.A.R.V.I.N. zpracovat?</label>
+              <textarea id="noteText" rows="4" maxlength="4000" placeholder="Např. připravit podklady pro čtvrteční meeting…" required></textarea>
+              <div class="note-footer">
+                <select id="noteArea" aria-label="Oblast">
+                  <option value="">Bez oblasti</option>
+                  <option value="CometX">CometX</option>
+                  <option value="Lab On Card">Lab On Card</option>
+                  <option value="Konzultace">Konzultace</option>
+                  <option value="Osobní">Osobní</option>
+                </select>
+                <button class="primary-button" type="submit">Zařadit do fronty</button>
+              </div>
+              <p id="noteMessage" class="form-message" role="status"></p>
+            </form>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <template id="emptyTemplate">
+      <p class="empty-state">Nic zde teď nevyžaduje pozornost.</p>
+    </template>
+
+    <script src="config.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
+
