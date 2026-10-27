@@ -7,7 +7,7 @@ const els = Object.fromEntries(
     "setupPanel", "loginPanel", "appPanel", "connectionBadge", "refreshButton", "signOutButton",
     "loginForm", "emailInput", "loginMessage", "todayLabel", "greeting", "briefing",
     "completenessBadge", "lastComplete", "taskCount", "areaGrid", "timeline", "priorities",
-    "tomorrow", "attention", "noteForm", "noteText", "noteArea", "noteMessage",
+    "tomorrow", "attention", "noteForm", "noteText", "noteArea", "noteMessage", "emptyTemplate",
   ].map((id) => [id, document.getElementById(id)]),
 );
 
@@ -342,6 +342,8 @@ els.signOutButton.addEventListener("click", async () => supabase?.auth.signOut()
 boot().catch((error) => {
   setConnection("error", "Chyba startu");
   showOnly(els.setupPanel);
+  els.setupPanel.querySelector(".eyebrow").textContent = "Chyba aplikace";
+  els.setupPanel.querySelector("h1").textContent = "Panel se nepodařilo spustit";
   els.setupPanel.querySelector("p:not(.eyebrow)").textContent = error.message;
 });
 

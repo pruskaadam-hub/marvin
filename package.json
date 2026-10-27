@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/smoke.mjs"
+    "test": "node tests/smoke.mjs && node tests/render.mjs"
+  },
+  "devDependencies": {
+    "linkedom": "0.18.12"
   }
 }
-
