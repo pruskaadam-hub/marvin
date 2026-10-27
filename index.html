@@ -157,6 +157,22 @@
       <p class="empty-state">Nic zde teď nevyžaduje pozornost.</p>
     </template>
 
+    <button id="chatToggle" class="chat-toggle primary-button hidden" type="button" aria-controls="marvinChat" aria-expanded="false">MARVIN</button>
+    <section id="marvinChat" class="chat-window hidden" role="dialog" aria-labelledby="chatTitle">
+      <header class="chat-header">
+        <h2 id="chatTitle">MARVIN</h2>
+        <button id="chatNew" class="text-button" type="button">Nová konverzace</button>
+        <button id="chatClose" class="icon-button" type="button" aria-label="Zavřít chat">×</button>
+      </header>
+      <div id="chatHistory" class="chat-history" role="log" aria-live="polite" aria-label="Historie konverzace"></div>
+      <p id="chatStatus" class="chat-status" role="status"></p>
+      <form id="chatForm" class="chat-form">
+        <label for="chatInput">Zpráva pro MARVINa</label>
+        <textarea id="chatInput" rows="3" maxlength="12000" placeholder="S čím potřebuješ pomoci?" required></textarea>
+        <div class="chat-footer"><small>Enter odešle · Shift+Enter nový řádek</small><button id="chatSend" class="primary-button" type="submit">Odeslat</button></div>
+      </form>
+    </section>
+
     <script src="config.js"></script>
     <script type="module" src="app.js"></script>
   </body>

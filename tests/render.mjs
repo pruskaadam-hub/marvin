@@ -6,7 +6,7 @@ import { parseHTML } from "linkedom";
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 // Replace only the browser CDN import; run the real startup and rendering code.
-const script = app.replace(/^import \{ createClient \} from [^\n]+;\n/, "");
+const script = app.replace(/^import .+;\n/gm, "");
 
 async function start({ payload = {}, status = 200, startupError = false } = {}) {
   const { document } = parseHTML(html);
@@ -27,6 +27,7 @@ async function start({ payload = {}, status = 200, startupError = false } = {}) 
       allowedEmail: session.user.email,
     } },
     createClient: () => client,
+    createChat: () => ({ setUser() {} }),
     fetch: async () => ({ ok: status === 200, status, json: async () => payload }),
   });
   return document;

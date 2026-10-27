@@ -1,4 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm";
+import { createChat } from "./chat.js";
 
 const config = window.MARVIN_CONFIG ?? {};
 const AREA_ORDER = ["CometX", "Lab On Card", "Konzultace", "Osobní"];
@@ -13,6 +14,13 @@ const els = Object.fromEntries(
 
 let supabase = null;
 let currentSession = null;
+let chatStorage;
+try { chatStorage = window.localStorage; } catch { /* Storage may be disabled. */ }
+const chat = createChat({
+  document, storage: chatStorage,
+  send: (body, signal) => api("chat", { method: "POST", body: JSON.stringify(body), signal }),
+  refresh: () => loadState(),
+});
 
 function isConfigured() {
   return /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(config.supabaseUrl ?? "")
@@ -223,7 +231,7 @@ async function api(path, options = {}) {
     },
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || payload.message || `Požadavek selhal (${response.status}).`);
+  if (!response.ok) throw Object.assign(new Error(payload.error || payload.message || `Požadavek selhal (${response.status}).`), { status: response.status });
   return payload;
 }
 
@@ -302,6 +310,7 @@ async function applySession(session) {
   const signedIn = Boolean(session?.user);
   els.signOutButton.classList.toggle("hidden", !signedIn);
   if (!signedIn) {
+    chat.setUser(null);
     els.emailInput.value = config.allowedEmail ?? "";
     setConnection("error", "Nepřihlášeno");
     showOnly(els.loginPanel);
@@ -309,11 +318,13 @@ async function applySession(session) {
   }
   const email = session.user.email?.toLowerCase();
   if (config.allowedEmail && email !== config.allowedEmail.toLowerCase()) {
+    chat.setUser(null);
     await supabase.auth.signOut();
     setMessage(els.loginMessage, "Tento účet nemá přístup.", "error");
     return;
   }
   showOnly(els.appPanel);
+  chat.setUser(session.user.id ?? email);
   await loadState();
 }
 

@@ -36,7 +36,7 @@ jobs:
       - name: Připravit veřejný web
         run: |
           mkdir _site
-          cp index.html app.js styles.css config.js favicon.svg .nojekyll _site/
+          cp index.html app.js chat.js styles.css config.js favicon.svg .nojekyll _site/
       - uses: actions/configure-pages@v5
         with:
           enablement: true

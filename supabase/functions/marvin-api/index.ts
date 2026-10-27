@@ -58,6 +58,21 @@ Deno.serve(async (request: Request) => {
   if (route === "stav") {
     if (request.method !== "GET") return json(405, { error: "Nepovolená metoda." }, headers);
     upstreamUrl = statusUrl;
+  } else if (route === "chat") {
+    if (request.method !== "POST") return json(405, { error: "Nepovolená metoda." }, headers);
+    const declaredLength = Number(request.headers.get("content-length") ?? 0);
+    if (declaredLength > MAX_BODY_BYTES) return json(413, { error: "Zpráva je příliš velká." }, headers);
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return json(413, { error: "Zpráva je příliš velká." }, headers);
+    let message: Record<string, unknown>;
+    try { message = JSON.parse(raw); } catch { return json(400, { error: "Neplatný JSON." }, headers); }
+    if (!message || typeof message !== "object" || Array.isArray(message)
+      || typeof message.text !== "string" || !message.text.trim() || message.text.length > 12000
+      || typeof message.sessionId !== "string" || !/^[a-zA-Z0-9_-]{8,200}$/.test(message.sessionId)) {
+      return json(400, { error: "Neplatná zpráva nebo ID konverzace." }, headers);
+    }
+    body = JSON.stringify({ text: message.text.trim(), sessionId: message.sessionId });
+    upstreamUrl = "https://cometx.app.n8n.cloud/webhook/marvin/chat";
   } else if (route === "prikaz") {
     if (request.method !== "POST") return json(405, { error: "Nepovolená metoda." }, headers);
     const declaredLength = Number(request.headers.get("content-length") ?? 0);
@@ -79,11 +94,14 @@ Deno.serve(async (request: Request) => {
       method: request.method,
       headers: { "X-Marvin-Key": secret, "X-Marvin-User": data.user.id, "X-Request-Id": crypto.randomUUID(), ...(body ? { "Content-Type": "application/json" } : {}) },
       body,
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(route === "chat" ? 90_000 : 15_000),
     });
     const responseText = await upstream.text();
     return new Response(responseText, { status: upstream.status, headers: { ...headers, "Content-Type": upstream.headers.get("content-type") ?? "application/json; charset=utf-8", "Cache-Control": "no-store" } });
-  } catch {
+  } catch (error) {
+    if (route === "chat" && error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      return json(504, { error: "MARVIN neodpověděl do 90 sekund." }, headers);
+    }
     return json(502, { error: "n8n je dočasně nedostupné." }, headers);
   }
 });

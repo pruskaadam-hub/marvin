@@ -16,6 +16,19 @@ V Supabase Dashboard → Edge Functions → Secrets nastav:
 
 Před finálním nasazením ověř, že `marvin_allowed_emails` odpovídá skutečnému přihlašovacímu účtu.
 
+## Chat
+
+`POST /functions/v1/marvin-api/chat` přijímá `{ text, sessionId }` a po stejné
+kontrole uživatele předá zprávu na `https://cometx.app.n8n.cloud/webhook/marvin/chat`.
+Používá existující `n8n_marvin_key` v hlavičce `X-Marvin-Key`; žádný další klíč
+ani proměnná nejsou potřeba. Čekání na n8n je omezené na 90 sekund, ostatní
+endpointy mají původních 15 sekund. n8n musí vrátit JSON `{ ok: true, odpoved }`.
+
+Prohlížeč ukládá ID konverzace a posledních 100 zpráv do localStorage zvlášť pro
+přihlášeného uživatele. „Nová konverzace“ mění ID a maže místní historii;
+neodstraňuje předchozí konverzaci z paměti n8n. Při vypnutém localStorage chat
+funguje do obnovení stránky. Markdown se vykresluje pouze přes textové DOM uzly.
+
 ## Deploy
 
 ```bash
