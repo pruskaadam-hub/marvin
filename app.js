@@ -10,11 +10,15 @@ const els = Object.fromEntries(
     "completenessBadge", "lastComplete", "taskCount", "areaGrid", "timeline", "priorities",
     "tomorrow", "attention", "noteForm", "noteText", "noteArea", "noteMessage", "emptyTemplate",
     "emailSummary", "emailSummaryTime", "emailSummaryToggle",
+    "homeView", "tasksView", "allTasks", "allTaskCount", "tasksMessage",
   ].map((id) => [id, document.getElementById(id)]),
 );
 
 let supabase = null;
 let currentSession = null;
+let allTasks = [];
+let tasksVersion = 0;
+const savingTasks = new Set();
 let chatStorage;
 try { chatStorage = window.localStorage; } catch { /* Storage may be disabled. */ }
 const chat = createChat({
@@ -61,6 +65,9 @@ function asArray(value) {
 function normalizeTask(item) {
   if (typeof item === "string") return { title: item, area: "Osobní", meta: "" };
   return {
+    id: item?.id,
+    archived: Boolean(item?.archivovano),
+    nextStep: escapeText(item?.dalsi_krok),
     title: escapeText(pick(item, ["nazev", "title", "text", "ukol"], "Neoznačený úkol")),
     area: escapeText(pick(item, ["oblast", "area", "projekt", "project"], "Osobní")),
     meta: escapeText(pick(item, ["termin", "plan_datum", "deadline", "meta"], "")),
@@ -204,6 +211,7 @@ function renderAreas(tasks) {
           meta.textContent = task.meta;
           li.appendChild(meta);
         }
+        li.appendChild(taskDoneButton(task));
         list.appendChild(li);
       });
     }
@@ -211,6 +219,102 @@ function renderAreas(tasks) {
     els.areaGrid.appendChild(card);
   });
   els.taskCount.textContent = `${tasks.length} otevřených`;
+}
+
+
+function isOpenTask(task) {
+  return !task.archived && !/^(hotovo|done|completed|zruseno)$/i.test(task.status ?? "");
+}
+
+function taskDoneButton(task) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "text-button task-done";
+  const saving = savingTasks.has(task.id);
+  button.textContent = saving ? "Ukládám…" : task.archived ? "Archivováno" : task.status === "zruseno" ? "Zrušeno" : "Hotovo";
+  button.disabled = !task.id || !isOpenTask(task) || saving;
+  button.setAttribute("aria-label", `${button.textContent}: ${task.title}`);
+  button.addEventListener("click", () => completeTask(task));
+  return button;
+}
+
+function renderTasks() {
+  renderAreas(allTasks.filter(isOpenTask));
+  els.allTaskCount.textContent = `${allTasks.length} celkem`;
+  els.allTasks.replaceChildren();
+  if (!allTasks.length) return appendEmpty(els.allTasks);
+  for (const task of allTasks) {
+    const row = document.createElement("li");
+    row.className = `all-task${isOpenTask(task) ? "" : " task-closed"}`;
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = task.title;
+    const meta = document.createElement("p");
+    meta.className = "task-meta";
+    const statuses = { novy: "Nový", v_reseni: "V řešení", ceka: "Čeká", hotovo: "Hotovo", zruseno: "Zrušeno" };
+    meta.textContent = [task.area, statuses[task.status] ?? task.status, task.meta ? formatDate(task.meta, { day: "numeric", month: "numeric", year: "numeric" }) : ""].filter(Boolean).join(" · ");
+    content.append(title, meta);
+    if (task.source === "gmail") {
+      const badge = document.createElement("span");
+      badge.className = "task-source";
+      badge.textContent = "z e-mailu";
+      title.appendChild(badge);
+    }
+    if (task.nextStep && isOpenTask(task)) {
+      const next = document.createElement("p");
+      next.className = "task-next";
+      next.textContent = task.nextStep;
+      content.appendChild(next);
+    }
+    row.append(content, taskDoneButton(task));
+    els.allTasks.appendChild(row);
+  }
+}
+
+function showPage() {
+  const tasksPage = window.location?.hash === "#ukoly";
+  els.homeView.classList.toggle("hidden", tasksPage);
+  els.tasksView.classList.toggle("hidden", !tasksPage);
+  document.title = tasksPage ? "Všechny úkoly · M.A.R.V.I.N." : "M.A.R.V.I.N. · Adamův operační panel";
+}
+
+async function fetchTasks() {
+  const tasks = [];
+  let offset = 0;
+  do {
+    const result = await api(`ukoly?offset=${offset}`);
+    if (!Array.isArray(result.ukoly)) throw new Error("Server nevrátil seznam úkolů.");
+    tasks.push(...result.ukoly.map(normalizeTask));
+    const next = result.nextOffset;
+    if (next == null) return tasks;
+    if (!Number.isSafeInteger(next) || next <= offset) throw new Error("Seznam úkolů se nepodařilo dokončit.");
+    offset = next;
+  } while (true);
+}
+
+async function completeTask(task) {
+  if (!task.id || savingTasks.has(task.id) || !isOpenTask(task)) return;
+  const userId = currentSession?.user?.id ?? currentSession?.user?.email;
+  savingTasks.add(task.id);
+  renderTasks();
+  setMessage(els.tasksMessage, "Ukládám dokončení úkolu…");
+  try {
+    const result = await api("ukol-hotovo", { method: "POST", body: JSON.stringify({ id: task.id }) });
+    if (userId !== (currentSession?.user?.id ?? currentSession?.user?.email)) return;
+    if (result.ok !== true || result.ukol?.id !== task.id || result.ukol?.stav !== "hotovo") throw new Error("Server nepotvrdil dokončení úkolu.");
+    tasksVersion++;
+    allTasks = allTasks.map(item => item.id === task.id ? { ...item, status: "hotovo" } : item);
+    renderTasks();
+    await loadState();
+    setMessage(els.tasksMessage, "Úkol je označený jako hotový.", "success");
+  } catch (error) {
+    if (userId === (currentSession?.user?.id ?? currentSession?.user?.email)) {
+      setMessage(els.tasksMessage, `${error.message} Dokončení se nepodařilo potvrdit. Obnov přehled nebo to zkus znovu.`, "error");
+    }
+  } finally {
+    savingTasks.delete(task.id);
+    renderTasks();
+  }
 }
 
 function renderTimeline(items) {
@@ -253,7 +357,8 @@ function render(data) {
   els.completenessBadge.className = `data-badge ${error ? "data-error" : complete ? "data-current" : "data-incomplete"}`;
   els.completenessBadge.textContent = error ? "Chyba dat" : complete ? "Data aktuální" : "Data neúplná";
   els.lastComplete.textContent = `Poslední úplné zpracování: ${formatDate(data.lastComplete, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`;
-  renderAreas(data.tasks);
+  // Tasks are read from the database through the authenticated gateway.
+  renderTasks();
   renderEmailSummary(data.emailSummary);
   renderTimeline(data.timeline);
   renderPriorities(data.priorities);
@@ -280,6 +385,9 @@ async function api(path, options = {}) {
 }
 
 async function loadState() {
+  const version = tasksVersion;
+  setMessage(els.tasksMessage, "");
+  const tasksRequest = fetchTasks().then(tasks => ({ tasks }), error => ({ error }));
   els.refreshButton.disabled = true;
   setConnection("loading", "Obnovuji");
   try {
@@ -294,6 +402,12 @@ async function loadState() {
       attention: [error.message],
     }));
   } finally {
+    const result = await tasksRequest;
+    if (version === tasksVersion) {
+      if (result.error) setMessage(els.tasksMessage, `Úkoly se nepodařilo obnovit: ${result.error.message}`, "error");
+      else allTasks = result.tasks;
+    }
+    renderTasks();
     els.refreshButton.disabled = false;
   }
 }
@@ -354,6 +468,10 @@ async function applySession(session) {
   const signedIn = Boolean(session?.user);
   els.signOutButton.classList.toggle("hidden", !signedIn);
   if (!signedIn) {
+    tasksVersion++;
+    allTasks = [];
+    renderTasks();
+    setMessage(els.tasksMessage, "");
     chat.setUser(null);
     els.emailInput.value = config.allowedEmail ?? "";
     setConnection("error", "Nepřihlášeno");
@@ -392,6 +510,8 @@ async function boot() {
 els.loginForm.addEventListener("submit", signIn);
 els.noteForm.addEventListener("submit", submitNote);
 els.refreshButton.addEventListener("click", loadState);
+window.addEventListener?.("hashchange", showPage);
+showPage();
 els.emailSummaryToggle.addEventListener("click", () => {
   const expanded = els.emailSummaryToggle.getAttribute("aria-expanded") !== "true";
   els.emailSummaryToggle.setAttribute("aria-expanded", String(expanded));

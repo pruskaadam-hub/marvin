@@ -46,12 +46,58 @@ Deno.serve(async (request: Request) => {
   const allowedEmails = csv("marvin_allowed_emails").map((email) => email.toLowerCase());
   if (!allowedEmails.length || !allowedEmails.includes(data.user.email.toLowerCase())) return json(403, { error: "Účet nemá přístup." }, headers);
 
+
+  const route = new URL(request.url).pathname.split("/").filter(Boolean).at(-1);
+  if (route === "ukoly" || route === "ukol-hotovo") {
+    if (request.method !== (route === "ukoly" ? "GET" : "POST")) return json(405, { error: "Nepovolená metoda." }, headers);
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!serviceKey) return json(503, { error: "Správa úkolů není dostupná." }, headers);
+    // This personal panel is restricted to the verified account above. The caller's
+    // Authorization header must never override the server-only database client.
+    const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    try {
+      if (route === "ukoly") {
+        const offsetText = new URL(request.url).searchParams.get("offset") ?? "0";
+        if (!/^\d{1,7}$/.test(offsetText)) return json(400, { error: "Neplatná stránka úkolů." }, headers);
+        const offset = Number(offsetText);
+        const { data: tasks, error: readError } = await db.from("ukoly")
+          .select("id,nazev,oblast,stav,termin,priorita,dalsi_krok,zdroj,revize,archivovano")
+          .order("vytvoreno", { ascending: true }).order("id", { ascending: true }).range(offset, offset + 199)
+          .abortSignal(AbortSignal.timeout(15_000));
+        if (readError || !tasks) throw readError ?? new Error("Missing tasks");
+        return json(200, { ukoly: tasks, nextOffset: tasks.length === 200 ? offset + 200 : null }, headers);
+      }
+      if (Number(request.headers.get("content-length") ?? 0) > 1024) return json(413, { error: "Příkaz je příliš velký." }, headers);
+      const raw = await request.text();
+      if (new TextEncoder().encode(raw).length > 1024) return json(413, { error: "Příkaz je příliš velký." }, headers);
+      let command;
+      try { command = JSON.parse(raw); } catch { return json(400, { error: "Neplatný JSON." }, headers); }
+      if (!command || typeof command.id !== "string" || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(command.id)) {
+        return json(400, { error: "Neplatné ID úkolu." }, headers);
+      }
+      const { data: task, error: readError } = await db.from("ukoly").select("id,stav,revize,archivovano")
+        .eq("id", command.id).abortSignal(AbortSignal.timeout(15_000)).maybeSingle();
+      if (readError) throw readError;
+      if (!task) return json(404, { error: "Úkol už neexistuje." }, headers);
+      if (task.stav === "hotovo") return json(200, { ok: true, ukol: task }, headers);
+      if (task.archivovano || task.stav === "zruseno") return json(409, { error: "Archivovaný nebo zrušený úkol nelze dokončit." }, headers);
+      const { data: updated, error: writeError } = await db.from("ukoly")
+        .update({ stav: "hotovo", revize: task.revize + 1, upraveno: new Date().toISOString() })
+        .eq("id", task.id).eq("revize", task.revize).eq("stav", task.stav).is("archivovano", null)
+        .select("id,stav,revize").abortSignal(AbortSignal.timeout(15_000)).maybeSingle();
+      if (writeError) throw writeError;
+      if (!updated) return json(409, { error: "Úkol se mezitím změnil. Obnov přehled a zkus to znovu." }, headers);
+      return json(200, { ok: true, ukol: updated }, headers);
+    } catch {
+      return json(502, { error: "Úkoly se nepodařilo načíst nebo uložit. Zkus to znovu." }, headers);
+    }
+  }
+
   const secret = Deno.env.get("n8n_marvin_key");
   const statusUrl = Deno.env.get("n8n_stav_url");
   const commandUrl = Deno.env.get("n8n_prikaz_url");
   if (!secret || !statusUrl || !commandUrl) return json(503, { error: "Brána není dokončená." }, headers);
 
-  const route = new URL(request.url).pathname.split("/").filter(Boolean).at(-1);
   let upstreamUrl = "";
   let body: string | undefined;
 

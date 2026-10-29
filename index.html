@@ -62,6 +62,8 @@
       </section>
 
       <section id="appPanel" class="app hidden" aria-live="polite">
+        <p id="tasksMessage" class="form-message" role="status"></p>
+        <div id="homeView">
         <div class="hero">
           <div>
             <p id="todayLabel" class="eyebrow"></p>
@@ -91,7 +93,7 @@
               <p class="eyebrow">Práce</p>
               <h2 id="areasTitle">Úkoly podle oblastí</h2>
             </div>
-            <span id="taskCount" class="count-badge">0 otevřených</span>
+            <div class="tasks-heading-actions"><a class="text-button" href="#ukoly">Všechny úkoly</a><span id="taskCount" class="count-badge">0 otevřených</span></div>
           </div>
           <div id="areaGrid" class="area-grid"></div>
         </section>
@@ -161,6 +163,17 @@
             </form>
           </section>
         </div>
+        </div>
+        <section id="tasksView" class="hidden" aria-labelledby="allTasksTitle">
+          <div class="section-heading tasks-page-heading">
+            <div>
+              <a class="back-link" href="#prehled">← Zpět na přehled</a>
+              <h1 id="allTasksTitle">Všechny úkoly</h1>
+            </div>
+            <span id="allTaskCount" class="count-badge">Načítám úkoly…</span>
+          </div>
+          <ul id="allTasks" class="all-tasks panel"></ul>
+        </section>
       </section>
     </main>
 
