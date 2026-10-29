@@ -1,5 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm";
-import { createChat } from "./chat.js";
+import { createChat, renderMarkdown } from "./chat.js";
 
 const config = window.MARVIN_CONFIG ?? {};
 const AREA_ORDER = ["CometX", "Lab On Card", "Konzultace", "Osobní"];
@@ -9,6 +9,7 @@ const els = Object.fromEntries(
     "loginForm", "emailInput", "loginMessage", "todayLabel", "greeting", "briefing",
     "completenessBadge", "lastComplete", "taskCount", "areaGrid", "timeline", "priorities",
     "tomorrow", "attention", "noteForm", "noteText", "noteArea", "noteMessage", "emptyTemplate",
+    "emailSummary", "emailSummaryTime", "emailSummaryToggle",
   ].map((id) => [id, document.getElementById(id)]),
 );
 
@@ -64,6 +65,7 @@ function normalizeTask(item) {
     area: escapeText(pick(item, ["oblast", "area", "projekt", "project"], "Osobní")),
     meta: escapeText(pick(item, ["termin", "plan_datum", "deadline", "meta"], "")),
     status: escapeText(pick(item, ["stav", "status"], "otevřeno")),
+    source: item?.zdroj,
   };
 }
 
@@ -81,7 +83,42 @@ function normalizeState(raw) {
     tomorrow: asArray(pick(overview, ["zitra", "tomorrow"], [])),
     attention: asArray(pick(overview, ["pozornost", "attention", "chyby", "errors"], [])),
     tasks: openTasks,
+    emailSummary: normalizeEmailSummary(payload.souhrn_emailu),
   };
+}
+
+function normalizeEmailSummary(value) {
+  const item = Array.isArray(value) ? value[0] : value;
+  if (!item || typeof item !== "object" || Array.isArray(item)
+    || typeof item.souhrn !== "string" || !item.souhrn.trim()) return null;
+  const date = typeof item.platne_k === "string" ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(item.platne_k) : null;
+  const time = typeof item.oblast === "string" ? /\b([01]?\d|2[0-3]):([0-5]\d)\b/.exec(item.oblast) : null;
+  return {
+    text: item.souhrn,
+    created: [date ? `${Number(date[3])}. ${Number(date[2])}.` : "", time ? `${time[1]}:${time[2]}` : ""].filter(Boolean).join(" · "),
+  };
+}
+
+function updateEmailSummaryToggle() {
+  const expanded = els.emailSummaryToggle.getAttribute("aria-expanded") === "true";
+  els.emailSummaryToggle.classList.toggle("hidden", !expanded && els.emailSummary.scrollHeight <= els.emailSummary.clientHeight + 1);
+}
+
+function renderEmailSummary(summary) {
+  els.emailSummaryTime.textContent = summary?.created ?? "";
+  els.emailSummaryTime.classList.toggle("hidden", !summary?.created);
+  els.emailSummary.classList.add("email-summary-collapsed");
+  els.emailSummaryToggle.setAttribute("aria-expanded", "false");
+  els.emailSummaryToggle.textContent = "Zobrazit celé";
+  els.emailSummaryToggle.classList.add("hidden");
+  els.emailSummary.replaceChildren();
+  if (!summary) {
+    els.emailSummary.textContent = "Zatím žádný souhrn. Další přijde v 7:00, 12:00 nebo 17:00.";
+    els.emailSummary.classList.remove("email-summary-collapsed");
+    return;
+  }
+  els.emailSummary.append(renderMarkdown(document, summary.text));
+  updateEmailSummaryToggle();
 }
 
 function formatDate(value, options) {
@@ -155,6 +192,12 @@ function renderAreas(tasks) {
         const li = document.createElement("li");
         li.className = "task-item";
         li.textContent = task.title;
+        if (task.source === "gmail") {
+          const badge = document.createElement("span");
+          badge.className = "task-source";
+          badge.textContent = "z e-mailu";
+          li.appendChild(badge);
+        }
         if (task.meta) {
           const meta = document.createElement("span");
           meta.className = "task-meta";
@@ -211,6 +254,7 @@ function render(data) {
   els.completenessBadge.textContent = error ? "Chyba dat" : complete ? "Data aktuální" : "Data neúplná";
   els.lastComplete.textContent = `Poslední úplné zpracování: ${formatDate(data.lastComplete, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`;
   renderAreas(data.tasks);
+  renderEmailSummary(data.emailSummary);
   renderTimeline(data.timeline);
   renderPriorities(data.priorities);
   renderTextList(els.tomorrow, data.tomorrow);
@@ -348,6 +392,15 @@ async function boot() {
 els.loginForm.addEventListener("submit", signIn);
 els.noteForm.addEventListener("submit", submitNote);
 els.refreshButton.addEventListener("click", loadState);
+els.emailSummaryToggle.addEventListener("click", () => {
+  const expanded = els.emailSummaryToggle.getAttribute("aria-expanded") !== "true";
+  els.emailSummaryToggle.setAttribute("aria-expanded", String(expanded));
+  els.emailSummaryToggle.textContent = expanded ? "Skrýt" : "Zobrazit celé";
+  els.emailSummary.classList.toggle("email-summary-collapsed", !expanded);
+});
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(updateEmailSummaryToggle).observe(els.emailSummary);
+}
 els.signOutButton.addEventListener("click", async () => supabase?.auth.signOut());
 
 boot().catch((error) => {

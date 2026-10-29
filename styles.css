@@ -98,6 +98,18 @@ input:focus, textarea:focus, select:focus { border-color: rgba(117,230,199,.7); 
 .task-item { position: relative; padding-left: 15px; color: #d9dee8; font-size: .82rem; line-height: 1.42; }
 .task-item::before { content: ""; position: absolute; width: 5px; height: 5px; top: .52em; left: 0; border-radius: 50%; background: var(--blue); }
 .task-meta { display: block; margin-top: 3px; color: var(--muted); font-size: .68rem; }
+.task-source { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; color: var(--muted); background: var(--surface-soft); font-size: .66rem; }
+
+.email-summary-time { margin: 6px 0 0; color: var(--muted); font-size: .76rem; }
+.email-summary { color: #d9dee8; font-size: .88rem; line-height: 1.6; overflow-wrap: anywhere; }
+.email-summary-collapsed { max-height: 9.6em; overflow: hidden; }
+.email-summary p { margin: 0 0 .5em; }
+.email-summary ul, .email-summary ol { margin: .5em 0; padding-left: 22px; }
+.email-summary h2, .email-summary h3, .email-summary h4, .email-summary h5, .email-summary h6 { font-size: 1em; margin: .5em 0; }
+.email-summary pre { white-space: pre-wrap; }
+.email-summary > :first-child { margin-top: 0; }
+.email-summary > :last-child { margin-bottom: 0; }
+#emailSummaryToggle { margin-top: 12px; font-size: .8rem; }
 
 .dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .panel { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; background: var(--surface); box-shadow: 0 15px 40px rgba(0,0,0,.16); backdrop-filter: blur(16px); }
